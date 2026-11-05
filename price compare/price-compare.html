@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مقارن الأسعار</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green-900:#163C2C;
+    --green-700:#1F7A54;
+    --green-600:#2F9E6B;
+    --green-500:#3FB37D;
+    --green-100:#E6F4EC;
+    --bg:#F6F8F7;
+    --surface:#FFFFFF;
+    --text:#16241D;
+    --text-soft:#5A6B62;
+    --border:#DCE7E1;
+    --danger:#C1443A;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1512;
+      --surface:#16201B;
+      --text:#EAF3ED;
+      --text-soft:#9CB3A7;
+      --border:#273930;
+      --green-100:#1B3327;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1512;
+    --surface:#16201B;
+    --text:#EAF3ED;
+    --text-soft:#9CB3A7;
+    --border:#273930;
+    --green-100:#1B3327;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Cairo',system-ui,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0 0 auto;
+    height:env(safe-area-inset-top,0px);
+    background:var(--bg);
+    z-index:10;
+  }
+  .wrap{
+    max-width:760px;
+    margin:0 auto;
+    padding:28px 18px 60px;
+  }
+  header{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:28px;
+  }
+  .logo{
+    width:44px;height:44px;border-radius:12px;
+    background:linear-gradient(145deg,var(--green-500),var(--green-700));
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px; flex-shrink:0;
+  }
+  h1{font-size:19px; font-weight:800; margin:0;}
+  .sub{font-size:13px; color:var(--text-soft); margin:2px 0 0;}
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:18px;
+  }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    background:var(--green-100);
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:16px;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:9px 6px;
+    border-radius:9px;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--text-soft);
+    cursor:pointer;
+    border:none;
+    background:transparent;
+    font-family:inherit;
+    transition:.15s;
+  }
+  .tab.active{
+    background:var(--green-600);
+    color:#fff;
+  }
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .search-row{
+    display:flex;
+    gap:8px;
+  }
+  input[type="text"], input[type="tel"]{
+    flex:1;
+    border:1.5px solid var(--border);
+    background:var(--bg);
+    color:var(--text);
+    border-radius:12px;
+    padding:13px 14px;
+    font-size:15px;
+    font-family:inherit;
+    outline:none;
+    transition:.15s;
+  }
+  input:focus{border-color:var(--green-600);}
+  button.go{
+    background:var(--green-600);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    padding:0 20px;
+    font-weight:700;
+    font-size:14.5px;
+    font-family:inherit;
+    cursor:pointer;
+    transition:.15s;
+  }
+  button.go:hover{background:var(--green-700);}
+  button.go:disabled{opacity:.6; cursor:default;}
+
+  .upload-box{
+    border:1.5px dashed var(--border);
+    border-radius:14px;
+    padding:26px 14px;
+    text-align:center;
+    color:var(--text-soft);
+    font-size:13.5px;
+    position:relative;
+  }
+  .upload-box b{display:block; color:var(--text); font-size:14.5px; margin-bottom:4px;}
+  .soon{
+    display:inline-block;
+    margin-top:10px;
+    font-size:11.5px;
+    font-weight:700;
+    background:var(--green-100);
+    color:var(--green-700);
+    padding:4px 10px;
+    border-radius:999px;
+  }
+
+  .note{
+    font-size:12px;
+    color:var(--text-soft);
+    margin-top:10px;
+    line-height:1.7;
+  }
+
+  #results{margin-top:22px;}
+  .state{
+    text-align:center;
+    color:var(--text-soft);
+    font-size:13.5px;
+    padding:30px 10px;
+  }
+  .state .big{font-size:28px; display:block; margin-bottom:8px;}
+
+  .source-group{margin-bottom:18px;}
+  .source-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+    padding:0 2px;
+  }
+  .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--green-500);
+    flex-shrink:0;
+  }
+  .source-head span{font-size:13.5px; font-weight:700; color:var(--text-soft);}
+
+  .item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:13px 14px;
+    margin-bottom:8px;
+    text-decoration:none;
+    color:var(--text);
+  }
+  .item:hover{border-color:var(--green-500);}
+  .item .name{font-size:13.5px; font-weight:600; line-height:1.5;}
+  .item .meta{font-size:11.5px; color:var(--text-soft); margin-top:3px;}
+  .price{
+    font-size:15px;
+    font-weight:800;
+    color:var(--green-700);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .price small{font-size:11px; font-weight:600; color:var(--text-soft);}
+  .unavailable{color:var(--danger); font-size:11px; font-weight:700;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">💊</div>
+    <div>
+      <h1>مقارن الأسعار</h1>
+      <p class="sub">دوّر على أي منتج واشوف سعره في أكتر من مصدر</p>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" data-tab="name">اسم المنتج</button>
+      <button class="tab" data-tab="barcode">الباركود</button>
+      <button class="tab" data-tab="image">صورة المنتج</button>
+    </div>
+
+    <div class="panel active" id="panel-name">
+      <div class="search-row">
+        <input type="text" id="nameInput" placeholder="اكتب اسم المنتج… مثلاً Artmed">
+        <button class="go" id="nameBtn">بحث</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-barcode">
+      <div class="search-row">
+        <input type="tel" id="barcodeInput" placeholder="اكتب رقم الباركود">
+        <button class="go" id="barcodeBtn">بحث</button>
+      </div>
+      <p class="note">البحث بالباركود بيدوّر على الرقم كنص داخل المصادر، ودقّته هتزيد أول ما نضيف قاعدة بيانات باركود متخصصة.</p>
+    </div>
+
+    <div class="panel" id="panel-image">
+      <label class="upload-box">
+        <input type="file" accept="image/*" style="display:none">
+        <b>ارفع صورة المنتج</b>
+        هنحاول نتعرف على اسم المنتج من الصورة تلقائيًا
+        <span class="soon">قريبًا</span>
+      </label>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+</div>
+
+<script>
+const EDGE_FUNCTION_URL = "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/clever-service";
+
+const SOURCE_LABELS = {
+  "anwar.store": "صيدلية أنور",
+  "shop.eva-cosmetics.com": "إيفا كوزمتكس"
+};
+
+const tabs = document.querySelectorAll(".tab");
+const panels = document.querySelectorAll(".panel");
+tabs.forEach(t => t.addEventListener("click", () => {
+  tabs.forEach(x => x.classList.remove("active"));
+  panels.forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById("panel-" + t.dataset.tab).classList.add("active");
+}));
+
+const resultsEl = document.getElementById("results");
+
+function renderState(html){
+  resultsEl.innerHTML = `<div class="state">${html}</div>`;
+}
+
+function escapeHtml(s){
+  return (s || "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+
+async function runSearch(query, btn){
+  if(!query || !query.trim()){
+    renderState("اكتب كلمة البحث الأول");
+    return;
+  }
+  btn.disabled = true;
+  renderState('<span class="big">⏳</span>جاري البحث في المصادر…');
+
+  try{
+    const res = await fetch(EDGE_FUNCTION_URL + "?q=" + encodeURIComponent(query.trim()), {
+      headers: { "Accept": "application/json" }
+    });
+    const data = await res.json();
+
+    const groups = (data.results || []).filter(g => g.results && g.results.length);
+
+    if(!groups.length){
+      renderState('<span class="big">🔍</span>مفيش نتائج للمنتج ده في المصادر المتاحة حاليًا (أنور، إيفا)');
+      return;
+    }
+
+    resultsEl.innerHTML = groups.map(g => `
+      <div class="source-group">
+        <div class="source-head">
+          <span class="dot"></span>
+          <span>${SOURCE_LABELS[g.domain] || g.domain} · ${g.results.length} نتيجة</span>
+        </div>
+        ${g.results.map(item => `
+          <a class="item" href="${item.url}" target="_blank" rel="noopener">
+            <div>
+              <div class="name">${escapeHtml(item.title)}</div>
+              ${item.available === false ? '<div class="unavailable">غير متوفر حاليًا</div>' : '<div class="meta">اضغط لفتح صفحة المنتج</div>'}
+            </div>
+            <div class="price">${escapeHtml(item.price)} <small>جنيه</small></div>
+          </a>
+        `).join("")}
+      </div>
+    `).join("");
+
+  }catch(e){
+    renderState('<span class="big">⚠️</span>حصلت مشكلة في الاتصال، حاول تاني');
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("nameBtn").addEventListener("click", () => {
+  const btn = document.getElementById("nameBtn");
+  runSearch(document.getElementById("nameInput").value, btn);
+});
+document.getElementById("nameInput").addEventListener("keydown", e => {
+  if(e.key === "Enter") document.getElementById("nameBtn").click();
+});
+
+document.getElementById("barcodeBtn").addEventListener("click", () => {
+  const btn = document.getElementById("barcodeBtn");
+  runSearch(document.getElementById("barcodeInput").value, btn);
+});
+document.getElementById("barcodeInput").addEventListener("keydown", e => {
+  if(e.key === "Enter") document.getElementById("barcodeBtn").click();
+});
+
+renderState("اكتب اسم منتج وجرّب البحث");
+</script>
+</body>
+</html>
