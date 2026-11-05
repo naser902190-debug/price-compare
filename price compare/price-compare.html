@@ -386,6 +386,28 @@ function similarity(qRaw, tRaw){
   return Math.max(tokenScore, editScore * 0.8);
 }
 
+function tokensOf(s){
+  return normalize(s).split(" ").filter(Boolean);
+}
+
+function jaccard(aTokens, bTokens){
+  const aSet = new Set(aTokens), bSet = new Set(bTokens);
+  let inter = 0;
+  aSet.forEach(x => { if(bSet.has(x)) inter++; });
+  const union = new Set([...aSet, ...bSet]).size;
+  return union ? inter / union : 0;
+}
+
+function strictMatch(query, title){
+  const qTokens = tokensOf(query);
+  const tTokens = tokensOf(title);
+  if(!qTokens.length || !tTokens.length) return 0;
+  const jac = jaccard(qTokens, tTokens);
+  const brandToken = qTokens[0];
+  const brandPresent = tTokens.some(t => t === brandToken || levenshtein(t, brandToken) <= 1);
+  return brandPresent ? jac : jac * 0.25;
+}
+
 function parsePrice(p){
   const n = parseFloat(String(p || "").replace(/[^\d.]/g, ""));
   return isNaN(n) ? Infinity : n;
@@ -455,8 +477,8 @@ async function searchExactProduct(title){
     let flat = [];
     groups.forEach(g => {
       (g.results || []).forEach(item => {
-        const sim = similarity(title, item.title);
-        if(sim >= 0.4) flat.push({ ...item, domain: g.domain });
+        const sim = strictMatch(title, item.title);
+        if(sim >= 0.5) flat.push({ ...item, domain: g.domain });
       });
     });
     if(!flat.length){
