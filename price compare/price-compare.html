@@ -484,12 +484,22 @@ function coreQuery(title){
 async function searchExactProduct(title){
   renderState('<span class="big">⏳</span>جاري تجميع أسعار نفس المنتج من كل مكان…');
   try{
-    const groups = await fetchResults(coreQuery(title));
+    const core = coreQuery(title);
+    const queries = [title];
+    if(normalize(core) !== normalize(title)) queries.push(core);
+
+    const allGroups = (await Promise.all(queries.map(q => fetchResults(q)))).flat();
+
+    const seenKeys = new Set();
     let flat = [];
-    groups.forEach(g => {
+    allGroups.forEach(g => {
       (g.results || []).forEach(item => {
         const sim = strictMatch(title, item.title);
-        if(sim >= 0.5) flat.push({ ...item, domain: g.domain });
+        if(sim < 0.5) return;
+        const key = g.domain + "::" + (item.url || item.title);
+        if(seenKeys.has(key)) return;
+        seenKeys.add(key);
+        flat.push({ ...item, domain: g.domain });
       });
     });
     if(!flat.length){
