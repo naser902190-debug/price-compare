@@ -470,10 +470,21 @@ const handleSuggest = debounce(async (value) => {
   }
 }, 350);
 
+function coreQuery(title){
+  let s = (title || "")
+    .replace(/\(.*?\)/g, " ")
+    .replace(/\d+\s*(ml|gm|g|kg|l|ملل|مل|جم|كجم)\b/gi, " ")
+    .replace(/[-–|:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = s.split(" ").filter(Boolean);
+  return tokens.slice(0, 4).join(" ") || title;
+}
+
 async function searchExactProduct(title){
   renderState('<span class="big">⏳</span>جاري تجميع أسعار نفس المنتج من كل مكان…');
   try{
-    const groups = await fetchResults(title);
+    const groups = await fetchResults(coreQuery(title));
     let flat = [];
     groups.forEach(g => {
       (g.results || []).forEach(item => {
