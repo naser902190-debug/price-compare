@@ -225,6 +225,30 @@
   }
   .price small{font-size:11px; font-weight:600; color:var(--text-soft);}
   .unavailable{color:var(--danger); font-size:11px; font-weight:700;}
+
+  .search-wrap{position:relative;}
+  .suggest-list{
+    position:absolute; top:calc(100% + 6px); right:0; left:0;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.14);
+    overflow:hidden; z-index:30; display:none;
+  }
+  .suggest-list.show{display:block;}
+  .suggest-item{
+    padding:11px 14px; font-size:13.5px; cursor:pointer; border-bottom:1px solid var(--border);
+  }
+  .suggest-item:last-child{border-bottom:none;}
+  .suggest-item:hover{background:var(--green-100);}
+
+  .exact-head{
+    font-size:12.5px; color:var(--text-soft); margin-bottom:12px; padding:0 2px;
+  }
+  .exact-head b{color:var(--text);}
+  .best-badge{
+    display:inline-block; margin-left:6px; font-size:10px; font-weight:800;
+    background:var(--green-600); color:#fff; padding:2px 7px; border-radius:999px;
+    vertical-align:middle;
+  }
 </style>
 </head>
 <body>
@@ -246,10 +270,14 @@
     </div>
 
     <div class="panel active" id="panel-name">
-      <div class="search-row">
-        <input type="text" id="nameInput" placeholder="اكتب اسم المنتج… مثلاً Artmed">
-        <button class="go" id="nameBtn">بحث</button>
+      <div class="search-wrap">
+        <div class="search-row">
+          <input type="text" id="nameInput" placeholder="اكتب اسم المنتج… مثلاً Artmed" autocomplete="off">
+          <button class="go" id="nameBtn">بحث</button>
+        </div>
+        <div class="suggest-list" id="nameSuggest"></div>
       </div>
+      <p class="note">هتظهرلك اقتراحات وانت بتكتب — اختار واحد عشان تشوف سعره في كل مكان مرتب من الأرخص، أو دوس بحث عشان تشوف كل النتائج القريبة من اللي كتبته.</p>
     </div>
 
     <div class="panel" id="panel-barcode">
@@ -300,6 +328,7 @@ tabs.forEach(t => t.addEventListener("click", () => {
 }));
 
 const resultsEl = document.getElementById("results");
+const suggestEl = document.getElementById("nameSuggest");
 
 function renderState(html){
   resultsEl.innerHTML = `<div class="state">${html}</div>`;
@@ -311,28 +340,167 @@ function escapeHtml(s){
   }[m]));
 }
 
-async function runSearch(query, btn){
+function normalize(s){
+  return (s || "")
+    .toString()
+    .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[^a-z0-9\u0600-\u06FF\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if(!m) return n;
+  if(!n) return m;
+  let prev = new Array(n + 1);
+  for(let j = 0; j <= n; j++) prev[j] = j;
+  for(let i = 1; i <= m; i++){
+    const cur = [i];
+    for(let j = 1; j <= n; j++){
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+function similarity(qRaw, tRaw){
+  const q = normalize(qRaw), t = normalize(tRaw);
+  if(!q || !t) return 0;
+  if(t.includes(q)) return 0.9 + Math.min(0.1, (q.length / Math.max(t.length, 1)) * 0.1);
+  const qTokens = q.split(" ").filter(Boolean);
+  const tTokens = t.split(" ").filter(Boolean);
+  const common = qTokens.filter(tok => tTokens.some(tt => tt === tok || tt.includes(tok) || tok.includes(tt))).length;
+  const tokenScore = common / Math.max(qTokens.length, 1);
+  let editScore = 0;
+  if(q.length <= 40 && t.length <= 40){
+    const dist = levenshtein(q, t);
+    editScore = 1 - dist / Math.max(q.length, t.length, 1);
+  }
+  return Math.max(tokenScore, editScore * 0.8);
+}
+
+function parsePrice(p){
+  const n = parseFloat(String(p || "").replace(/[^\d.]/g, ""));
+  return isNaN(n) ? Infinity : n;
+}
+
+function debounce(fn, delay){
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+async function fetchResults(query){
+  const res = await fetch(EDGE_FUNCTION_URL + "?q=" + encodeURIComponent(query.trim()), {
+    headers: { "Accept": "application/json" }
+  });
+  const data = await res.json();
+  return data.results || [];
+}
+
+function hideSuggest(){
+  suggestEl.classList.remove("show");
+  suggestEl.innerHTML = "";
+}
+
+const handleSuggest = debounce(async (value) => {
+  const q = value.trim();
+  if(q.length < 2){ hideSuggest(); return; }
+  try{
+    const groups = await fetchResults(q);
+    const seen = new Map();
+    groups.forEach(g => {
+      (g.results || []).forEach(item => {
+        const key = normalize(item.title);
+        if(!key) return;
+        const sim = similarity(q, item.title);
+        const existing = seen.get(key);
+        if(!existing || sim > existing.sim){
+          seen.set(key, { title: item.title, sim });
+        }
+      });
+    });
+    const list = [...seen.values()].sort((a, b) => b.sim - a.sim).slice(0, 8);
+    if(!list.length){ hideSuggest(); return; }
+    suggestEl.innerHTML = list.map(s =>
+      `<div class="suggest-item" data-title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</div>`
+    ).join("");
+    suggestEl.classList.add("show");
+    suggestEl.querySelectorAll(".suggest-item").forEach(el => {
+      el.addEventListener("click", () => {
+        const title = el.dataset.title;
+        document.getElementById("nameInput").value = title;
+        hideSuggest();
+        searchExactProduct(title);
+      });
+    });
+  }catch(e){
+    hideSuggest();
+  }
+}, 350);
+
+async function searchExactProduct(title){
+  renderState('<span class="big">⏳</span>جاري تجميع أسعار نفس المنتج من كل مكان…');
+  try{
+    const groups = await fetchResults(title);
+    let flat = [];
+    groups.forEach(g => {
+      (g.results || []).forEach(item => {
+        const sim = similarity(title, item.title);
+        if(sim >= 0.4) flat.push({ ...item, domain: g.domain });
+      });
+    });
+    if(!flat.length){
+      renderState('<span class="big">🔍</span>مفيش نتائج مطابقة لنفس المنتج ده دلوقتي');
+      return;
+    }
+    flat.sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
+    resultsEl.innerHTML = `
+      <div class="exact-head">أسعار "<b>${escapeHtml(title)}</b>" — من الأقل للأعلى</div>
+      ${flat.map((item, i) => `
+        <a class="item" href="${item.url}" target="_blank" rel="noopener">
+          <div>
+            <div class="name">${escapeHtml(item.title)}${i === 0 ? '<span class="best-badge">الأرخص</span>' : ''}</div>
+            <div class="meta">${SOURCE_LABELS[item.domain] || item.domain}${item.available === false ? ' · غير متوفر حاليًا' : ''}</div>
+          </div>
+          <div class="price">${escapeHtml(item.price)} <small>جنيه</small></div>
+        </a>
+      `).join("")}
+    `;
+  }catch(e){
+    renderState('<span class="big">⚠️</span>حصلت مشكلة في الاتصال، حاول تاني');
+  }
+}
+
+async function searchBroad(query, btn){
   if(!query || !query.trim()){
     renderState("اكتب كلمة البحث الأول");
     return;
   }
   btn.disabled = true;
   renderState('<span class="big">⏳</span>جاري البحث في المصادر…');
-
   try{
-    const res = await fetch(EDGE_FUNCTION_URL + "?q=" + encodeURIComponent(query.trim()), {
-      headers: { "Accept": "application/json" }
-    });
-    const data = await res.json();
+    const groups = await fetchResults(query);
+    const filtered = groups.map(g => ({
+      domain: g.domain,
+      results: (g.results || []).filter(item => similarity(query, item.title) >= 0.22)
+    })).filter(g => g.results.length);
 
-    const groups = (data.results || []).filter(g => g.results && g.results.length);
-
-    if(!groups.length){
-      renderState('<span class="big">🔍</span>مفيش نتائج للمنتج ده في المصادر المتاحة حاليًا');
+    if(!filtered.length){
+      renderState(`<span class="big">🔍</span>مفيش نتائج قريبة من "${escapeHtml(query)}" في المصادر المتاحة حاليًا`);
       return;
     }
 
-    resultsEl.innerHTML = groups.map(g => `
+    resultsEl.innerHTML = filtered.map(g => `
       <div class="source-group">
         <div class="source-head">
           <span class="dot"></span>
@@ -349,7 +517,6 @@ async function runSearch(query, btn){
         `).join("")}
       </div>
     `).join("");
-
   }catch(e){
     renderState('<span class="big">⚠️</span>حصلت مشكلة في الاتصال، حاول تاني');
   }finally{
@@ -357,23 +524,34 @@ async function runSearch(query, btn){
   }
 }
 
-document.getElementById("nameBtn").addEventListener("click", () => {
-  const btn = document.getElementById("nameBtn");
-  runSearch(document.getElementById("nameInput").value, btn);
+document.getElementById("nameInput").addEventListener("input", e => {
+  handleSuggest(e.target.value);
 });
 document.getElementById("nameInput").addEventListener("keydown", e => {
-  if(e.key === "Enter") document.getElementById("nameBtn").click();
+  if(e.key === "Enter"){
+    hideSuggest();
+    document.getElementById("nameBtn").click();
+  }
+  if(e.key === "Escape") hideSuggest();
+});
+document.addEventListener("click", e => {
+  if(!e.target.closest(".search-wrap")) hideSuggest();
+});
+document.getElementById("nameBtn").addEventListener("click", () => {
+  hideSuggest();
+  const btn = document.getElementById("nameBtn");
+  searchBroad(document.getElementById("nameInput").value, btn);
 });
 
 document.getElementById("barcodeBtn").addEventListener("click", () => {
   const btn = document.getElementById("barcodeBtn");
-  runSearch(document.getElementById("barcodeInput").value, btn);
+  searchBroad(document.getElementById("barcodeInput").value, btn);
 });
 document.getElementById("barcodeInput").addEventListener("keydown", e => {
   if(e.key === "Enter") document.getElementById("barcodeBtn").click();
 });
 
-renderState("اكتب اسم منتج وجرّب البحث");
+renderState("ابدأ تكتب اسم منتج، وهتظهرلك اقتراحات تقدر تختار منها");
 </script>
 </body>
 </html>
