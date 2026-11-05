@@ -279,7 +279,12 @@ const EDGE_FUNCTION_URL = "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1
 
 const SOURCE_LABELS = {
   "anwar.store": "صيدلية أنور",
-  "shop.eva-cosmetics.com": "إيفا كوزمتكس"
+  "shop.eva-cosmetics.com": "إيفا كوزمتكس",
+  "leapegy.com": "ليب",
+  "eparkville.com": "باركفيل",
+  "e-majestic.com": "ماجيستيك",
+  "u-richi.com": "يوريتشي",
+  "penduline.com": "بيندولين"
 };
 
 const tabs = document.querySelectorAll(".tab");
@@ -320,7 +325,7 @@ async function runSearch(query, btn){
     const groups = (data.results || []).filter(g => g.results && g.results.length);
 
     if(!groups.length){
-      renderState('<span class="big">🔍</span>مفيش نتائج للمنتج ده في المصادر المتاحة حاليًا (أنور، إيفا)');
+      renderState('<span class="big">🔍</span>مفيش نتائج للمنتج ده في المصادر المتاحة حاليًا');
       return;
     }
 
