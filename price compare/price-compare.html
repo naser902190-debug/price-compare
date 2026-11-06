@@ -349,6 +349,8 @@ function normalize(s){
     .replace(/ى/g, "ي")
     .replace(/ة/g, "ه")
     .replace(/[^a-z0-9\u0600-\u06FF\s]/g, " ")
+    .replace(/[اويهة]/g, "")
+    .replace(/[aeiouy]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -596,5 +598,3 @@ document.getElementById("barcodeInput").addEventListener("keydown", e => {
 
 renderState("ابدأ تكتب اسم منتج، وهتظهرلك اقتراحات تقدر تختار منها");
 </script>
-</body>
-</html>
