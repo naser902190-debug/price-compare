@@ -453,7 +453,11 @@ const handleSuggest = debounce(async (value) => {
         }
       });
     });
-    const list = [...seen.values()].sort((a, b) => b.sim - a.sim).slice(0, 8);
+    const MIN_SUGGEST_SIM = 0.35;
+    const list = [...seen.values()]
+      .filter(s => s.sim >= MIN_SUGGEST_SIM)
+      .sort((a, b) => b.sim - a.sim)
+      .slice(0, 8);
     if(!list.length){ hideSuggest(); return; }
     suggestEl.innerHTML = list.map(s =>
       `<div class="suggest-item" data-title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</div>`
