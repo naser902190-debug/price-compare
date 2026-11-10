@@ -11,6 +11,6 @@ jobs:
     steps:
       - name: Call Supabase sync function
         run: |
-          curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/sync-catalog" \
+          curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/swift-endpoint" \
             -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
             --fail --show-error
