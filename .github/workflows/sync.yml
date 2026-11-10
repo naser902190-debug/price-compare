@@ -1,0 +1,16 @@
+name: Daily Catalog Sync
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase sync function
+        run: |
+          curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/sync-catalog" \
+            -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
+            --fail --show-error
