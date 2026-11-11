@@ -8,10 +8,22 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 1
+      matrix:
+        store:
+          - anwar.store
+          - shop.eva-cosmetics.com
+          - leapegy.com
+          - eparkville.com
+          - e-majestic.com
+          - u-richi.com
+          - taypharmacies.com
+          - alejon.com
     steps:
-      - name: Call Supabase sync function
+      - name: Sync ${{ matrix.store }}
         run: |
-          curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/swift-endpoint" \
+          curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/swift-endpoint?store=${{ matrix.store }}" \
             -H "Authorization: Bearer sb_publishable_R9K1vK5jjRQcnDtg_KsXKQ_3eu1bomg" \
             -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
             --fail --show-error
