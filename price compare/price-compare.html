@@ -303,7 +303,8 @@
 </div>
 
 <script>
-const EDGE_FUNCTION_URL = "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/clever-service";
+const SUPABASE_URL = "https://awyffxemsvlhqtvlmvwx.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_R9K1vK5jjRQcnDtg_KsXKQ_3eu1bomg";
 
 const SOURCE_LABELS = {
   "anwar.store": "صيدلية أنور",
@@ -340,76 +341,6 @@ function escapeHtml(s){
   }[m]));
 }
 
-function normalize(s){
-  return (s || "")
-    .toString()
-    .toLowerCase()
-    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
-    .replace(/[إأآا]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/[^a-z0-9\u0600-\u06FF\s]/g, " ")
-    .replace(/[اويهة]/g, "")
-    .replace(/[aeiouy]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function levenshtein(a, b){
-  const m = a.length, n = b.length;
-  if(!m) return n;
-  if(!n) return m;
-  let prev = new Array(n + 1);
-  for(let j = 0; j <= n; j++) prev[j] = j;
-  for(let i = 1; i <= m; i++){
-    const cur = [i];
-    for(let j = 1; j <= n; j++){
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-    }
-    prev = cur;
-  }
-  return prev[n];
-}
-
-function similarity(qRaw, tRaw){
-  const q = normalize(qRaw), t = normalize(tRaw);
-  if(!q || !t) return 0;
-  if(t.includes(q)) return 0.9 + Math.min(0.1, (q.length / Math.max(t.length, 1)) * 0.1);
-  const qTokens = q.split(" ").filter(Boolean);
-  const tTokens = t.split(" ").filter(Boolean);
-  const common = qTokens.filter(tok => tTokens.some(tt => tt === tok || tt.includes(tok) || tok.includes(tt))).length;
-  const tokenScore = common / Math.max(qTokens.length, 1);
-  let editScore = 0;
-  if(q.length <= 40 && t.length <= 40){
-    const dist = levenshtein(q, t);
-    editScore = 1 - dist / Math.max(q.length, t.length, 1);
-  }
-  return Math.max(tokenScore, editScore * 0.8);
-}
-
-function tokensOf(s){
-  return normalize(s).split(" ").filter(Boolean);
-}
-
-function jaccard(aTokens, bTokens){
-  const aSet = new Set(aTokens), bSet = new Set(bTokens);
-  let inter = 0;
-  aSet.forEach(x => { if(bSet.has(x)) inter++; });
-  const union = new Set([...aSet, ...bSet]).size;
-  return union ? inter / union : 0;
-}
-
-function strictMatch(query, title){
-  const qTokens = tokensOf(query);
-  const tTokens = tokensOf(title);
-  if(!qTokens.length || !tTokens.length) return 0;
-  const jac = jaccard(qTokens, tTokens);
-  const brandToken = qTokens[0];
-  const brandPresent = tTokens.some(t => t === brandToken || levenshtein(t, brandToken) <= 1);
-  return brandPresent ? jac : jac * 0.25;
-}
-
 function parsePrice(p){
   const n = parseFloat(String(p || "").replace(/[^\d.]/g, ""));
   return isNaN(n) ? Infinity : n;
@@ -423,12 +354,18 @@ function debounce(fn, delay){
   };
 }
 
-async function fetchResults(query){
-  const res = await fetch(EDGE_FUNCTION_URL + "?q=" + encodeURIComponent(query.trim()), {
-    headers: { "Accept": "application/json" }
+async function searchListings(query, limit){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/search_listings`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ q: query.trim(), limit_count: limit }),
   });
-  const data = await res.json();
-  return data.results || [];
+  if(!res.ok) throw new Error("search failed");
+  return await res.json();
 }
 
 function hideSuggest(){
@@ -440,26 +377,18 @@ const handleSuggest = debounce(async (value) => {
   const q = value.trim();
   if(q.length < 2){ hideSuggest(); return; }
   try{
-    const groups = await fetchResults(q);
-    const seen = new Map();
-    groups.forEach(g => {
-      (g.results || []).forEach(item => {
-        const key = normalize(item.title);
-        if(!key) return;
-        const sim = similarity(q, item.title);
-        const existing = seen.get(key);
-        if(!existing || sim > existing.sim){
-          seen.set(key, { title: item.title, sim });
-        }
-      });
+    const rows = await searchListings(q, 20);
+    const seen = new Set();
+    const list = [];
+    rows.forEach(item => {
+      const key = item.title.toLowerCase().trim();
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      list.push({ title: item.title });
     });
-    const MIN_SUGGEST_SIM = 0.35;
-    const list = [...seen.values()]
-      .filter(s => s.sim >= MIN_SUGGEST_SIM)
-      .sort((a, b) => b.sim - a.sim)
-      .slice(0, 8);
     if(!list.length){ hideSuggest(); return; }
-    suggestEl.innerHTML = list.map(s =>
+    const top = list.slice(0, 8);
+    suggestEl.innerHTML = top.map(s =>
       `<div class="suggest-item" data-title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</div>`
     ).join("");
     suggestEl.classList.add("show");
@@ -476,38 +405,10 @@ const handleSuggest = debounce(async (value) => {
   }
 }, 350);
 
-function coreQuery(title){
-  let s = (title || "")
-    .replace(/\(.*?\)/g, " ")
-    .replace(/\d+\s*(ml|gm|g|kg|l|ملل|مل|جم|كجم)\b/gi, " ")
-    .replace(/[-–|:]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const tokens = s.split(" ").filter(Boolean);
-  return tokens.slice(0, 4).join(" ") || title;
-}
-
 async function searchExactProduct(title){
   renderState('<span class="big">⏳</span>جاري تجميع أسعار نفس المنتج من كل مكان…');
   try{
-    const core = coreQuery(title);
-    const queries = [title];
-    if(normalize(core) !== normalize(title)) queries.push(core);
-
-    const allGroups = (await Promise.all(queries.map(q => fetchResults(q)))).flat();
-
-    const seenKeys = new Set();
-    let flat = [];
-    allGroups.forEach(g => {
-      (g.results || []).forEach(item => {
-        const sim = strictMatch(title, item.title);
-        if(sim < 0.5) return;
-        const key = g.domain + "::" + (item.url || item.title);
-        if(seenKeys.has(key)) return;
-        seenKeys.add(key);
-        flat.push({ ...item, domain: g.domain });
-      });
-    });
+    const flat = await searchListings(title, 50);
     if(!flat.length){
       renderState('<span class="big">🔍</span>مفيش نتائج مطابقة لنفس المنتج ده دلوقتي');
       return;
@@ -536,18 +437,21 @@ async function searchBroad(query, btn){
     return;
   }
   btn.disabled = true;
-  renderState('<span class="big">⏳</span>جاري البحث في المصادر…');
+  renderState('<span class="big">⏳</span>جاري البحث في قاعدة البيانات…');
   try{
-    const groups = await fetchResults(query);
-    const filtered = groups.map(g => ({
-      domain: g.domain,
-      results: (g.results || []).filter(item => similarity(query, item.title) >= 0.22)
-    })).filter(g => g.results.length);
+    const rows = await searchListings(query, 60);
 
-    if(!filtered.length){
+    if(!rows.length){
       renderState(`<span class="big">🔍</span>مفيش نتائج قريبة من "${escapeHtml(query)}" في المصادر المتاحة حاليًا`);
       return;
     }
+
+    const byDomain = new Map();
+    rows.forEach(item => {
+      if(!byDomain.has(item.domain)) byDomain.set(item.domain, []);
+      byDomain.get(item.domain).push(item);
+    });
+    const filtered = [...byDomain.entries()].map(([domain, results]) => ({ domain, results }));
 
     resultsEl.innerHTML = filtered.map(g => `
       <div class="source-group">
@@ -602,3 +506,5 @@ document.getElementById("barcodeInput").addEventListener("keydown", e => {
 
 renderState("ابدأ تكتب اسم منتج، وهتظهرلك اقتراحات تقدر تختار منها");
 </script>
+</body>
+</html>
