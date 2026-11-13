@@ -346,6 +346,11 @@ function parsePrice(p){
   return isNaN(n) ? Infinity : n;
 }
 
+function formatPrice(p){
+  const n = Number(p);
+  return isNaN(n) ? escapeHtml(String(p ?? "")) : n.toFixed(2);
+}
+
 function debounce(fn, delay){
   let timer;
   return (...args) => {
@@ -422,7 +427,7 @@ async function searchExactProduct(title){
             <div class="name">${escapeHtml(item.title)}${i === 0 ? '<span class="best-badge">الأرخص</span>' : ''}</div>
             <div class="meta">${SOURCE_LABELS[item.domain] || item.domain}${item.available === false ? ' · غير متوفر حاليًا' : ''}</div>
           </div>
-          <div class="price">${escapeHtml(item.price)} <small>جنيه</small></div>
+          <div class="price">${formatPrice(item.price)} <small>جنيه</small></div>
         </a>
       `).join("")}
     `;
@@ -465,7 +470,7 @@ async function searchBroad(query, btn){
               <div class="name">${escapeHtml(item.title)}</div>
               ${item.available === false ? '<div class="unavailable">غير متوفر حاليًا</div>' : '<div class="meta">اضغط لفتح صفحة المنتج</div>'}
             </div>
-            <div class="price">${escapeHtml(item.price)} <small>جنيه</small></div>
+            <div class="price">${formatPrice(item.price)} <small>جنيه</small></div>
           </a>
         `).join("")}
       </div>
