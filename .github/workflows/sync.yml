@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync:
+  sync-simple:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       max-parallel: 1
       matrix:
         store:
@@ -18,8 +19,6 @@ jobs:
           - eparkville.com
           - e-majestic.com
           - u-richi.com
-          - taypharmacies.com
-          - alejon.com
     steps:
       - name: Sync ${{ matrix.store }}
         run: |
@@ -27,3 +26,22 @@ jobs:
             -H "Authorization: Bearer sb_publishable_R9K1vK5jjRQcnDtg_KsXKQ_3eu1bomg" \
             -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
             --fail --show-error
+
+  sync-large:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        store: [taypharmacies.com, alejon.com]
+    steps:
+      - name: Sync ${{ matrix.store }} in batches
+        run: |
+          for start in 1 11 21 31 41 51 61 71 81 91; do
+            end=$((start + 9))
+            echo "Pages $start to $end"
+            curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/swift-endpoint?store=${{ matrix.store }}&page_from=$start&page_to=$end" \
+              -H "Authorization: Bearer sb_publishable_R9K1vK5jjRQcnDtg_KsXKQ_3eu1bomg" \
+              -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
+              --fail --show-error
+          done
