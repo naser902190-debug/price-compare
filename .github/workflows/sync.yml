@@ -26,7 +26,6 @@ jobs:
             -H "Authorization: Bearer sb_publishable_R9K1vK5jjRQcnDtg_KsXKQ_3eu1bomg" \
             -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
             --fail --show-error
-
   sync-large:
     runs-on: ubuntu-latest
     strategy:
@@ -37,7 +36,7 @@ jobs:
     steps:
       - name: Sync ${{ matrix.store }} in batches
         run: |
-          for start in 1 11 21 31 41 51 61 71 81 91; do
+          for start in 1 11 21 31 41 51 61 71 81 91 101 111 121 131 141 151 161 171 181 191 201 211 221 231 241 251 261 271 281 291; do
             end=$((start + 9))
             echo "Pages $start to $end"
             curl -X POST "https://awyffxemsvlhqtvlmvwx.supabase.co/functions/v1/swift-endpoint?store=${{ matrix.store }}&page_from=$start&page_to=$end" \
@@ -45,3 +44,4 @@ jobs:
               -H "x-sync-token: ${{ secrets.SYNC_SECRET }}" \
               --fail --show-error
           done
+  
