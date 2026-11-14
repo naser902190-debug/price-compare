@@ -231,14 +231,15 @@
     position:absolute; top:calc(100% + 6px); right:0; left:0;
     background:var(--surface); border:1px solid var(--border); border-radius:14px;
     box-shadow:0 10px 30px rgba(0,0,0,.14);
-    overflow:hidden; z-index:30; display:none;
+    overflow-y:auto; max-height:320px; z-index:30; display:none;
+    overscroll-behavior:contain;
   }
   .suggest-list.show{display:block;}
   .suggest-item{
     padding:11px 14px; font-size:13.5px; cursor:pointer; border-bottom:1px solid var(--border);
   }
   .suggest-item:last-child{border-bottom:none;}
-  .suggest-item:hover{background:var(--green-100);}
+  .suggest-item:hover, .suggest-item.active{background:var(--green-100);}
 
   .exact-head{
     font-size:12.5px; color:var(--text-soft); margin-bottom:12px; padding:0 2px;
@@ -378,11 +379,23 @@ function hideSuggest(){
   suggestEl.innerHTML = "";
 }
 
+let activeSuggestIndex = -1;
+
+function setActiveSuggest(index){
+  const items = [...suggestEl.querySelectorAll(".suggest-item")];
+  items.forEach(el => el.classList.remove("active"));
+  if(index >= 0 && index < items.length){
+    items[index].classList.add("active");
+    items[index].scrollIntoView({ block: "nearest" });
+  }
+  activeSuggestIndex = index;
+}
+
 const handleSuggest = debounce(async (value) => {
   const q = value.trim();
   if(q.length < 2){ hideSuggest(); return; }
   try{
-    const rows = await searchListings(q, 20);
+    const rows = await searchListings(q, 200);
     const seen = new Set();
     const list = [];
     rows.forEach(item => {
@@ -392,8 +405,8 @@ const handleSuggest = debounce(async (value) => {
       list.push({ title: item.title });
     });
     if(!list.length){ hideSuggest(); return; }
-    const top = list.slice(0, 8);
-    suggestEl.innerHTML = top.map(s =>
+    activeSuggestIndex = -1;
+    suggestEl.innerHTML = list.map(s =>
       `<div class="suggest-item" data-title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</div>`
     ).join("");
     suggestEl.classList.add("show");
@@ -486,9 +499,28 @@ document.getElementById("nameInput").addEventListener("input", e => {
   handleSuggest(e.target.value);
 });
 document.getElementById("nameInput").addEventListener("keydown", e => {
+  const items = suggestEl.classList.contains("show")
+    ? [...suggestEl.querySelectorAll(".suggest-item")]
+    : [];
+
+  if(e.key === "ArrowDown" && items.length){
+    e.preventDefault();
+    setActiveSuggest((activeSuggestIndex + 1) % items.length);
+    return;
+  }
+  if(e.key === "ArrowUp" && items.length){
+    e.preventDefault();
+    setActiveSuggest((activeSuggestIndex - 1 + items.length) % items.length);
+    return;
+  }
   if(e.key === "Enter"){
+    if(items.length && activeSuggestIndex >= 0){
+      items[activeSuggestIndex].click();
+      return;
+    }
     hideSuggest();
     document.getElementById("nameBtn").click();
+    return;
   }
   if(e.key === "Escape") hideSuggest();
 });
